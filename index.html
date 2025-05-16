@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shivam AI Chatbot</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+        }
+        .chat-container {
+            width: 100%;
+            max-width: 400px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            height: 80vh;
+            overflow: hidden;
+        }
+        .chat-header {
+            background: #007bff;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 18px;
+        }
+        .chat-body {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background: #f9f9f9;
+        }
+        .chat-message {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-message.user {
+            align-items: flex-end;
+        }
+        .chat-message.bot {
+            align-items: flex-start;
+        }
+        .chat-message.typing {
+            align-items: flex-start;
+            font-style: italic;
+            color: #666;
+        }
+        .message-bubble {
+            max-width: 70%;
+            padding: 10px;
+            border-radius: 15px;
+            margin: 5px 0;
+            line-height: 1.5;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        .message-bubble p {
+            margin: 0;
+        }
+        .user .message-bubble {
+            background: #007bff;
+            color: white;
+        }
+        .bot .message-bubble {
+            background: #e9ecef;
+            color: black;
+        }
+        .typing .message-bubble {
+            background: #e9ecef;
+            color: #666;
+        }
+        .copy-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+            margin-top: 5px;
+            align-self: flex-start;
+        }
+        .user .copy-btn {
+            align-self: flex-end;
+        }
+        .copy-btn:hover svg {
+            fill: #007bff;
+        }
+        .chat-footer {
+            padding: 15px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        #user-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+        }
+        #send-btn {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        #send-btn:hover {
+            background: #0056b3;
+        }
+        #clear-btn {
+            padding: 10px 20px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        #clear-btn:hover {
+            background: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">Shivam AI Chatbot</div>
+        <div class="chat-body" id="chat-body"></div>
+        <div class="chat-footer">
+            <button id="clear-btn">Clear Chat</button>
+            <input type="text" id="user-input" placeholder="Type your message...">
+            <button id="send-btn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'AIzaSyDplDBBIozTkRJUVB0IicHl4s3_GltNk38'; // Replace with your Gemini API key from Google AI Studio
+        const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent';
+
+        const chatBody = document.getElementById('chat-body');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const clearBtn = document.getElementById('clear-btn');
+
+        // Add message to chat
+        function addMessage(content, isUser, isTyping = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${isUser ? 'user' : isTyping ? 'typing' : 'bot'}`;
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            if (isUser || isTyping) {
+                bubble.textContent = content;
+            } else {
+                bubble.innerHTML = marked.parse(content); // Render markdown
+            }
+            messageDiv.appendChild(bubble);
+
+            // Add copy button (except for typing messages)
+            if (!isTyping) {
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#666">
+                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                    </svg>
+                `;
+                copyBtn.onclick = () => {
+                    // Fallback copy function
+                    function copyText(text) {
+                        try {
+                            // Try modern Clipboard API
+                            return navigator.clipboard.writeText(text).then(() => {
+                                alert('Message copied to clipboard!');
+                            }).catch(() => {
+                                // Fallback to execCommand
+                                const textarea = document.createElement('textarea');
+                                textarea.value = text;
+                                document.body.appendChild(textarea);
+                                textarea.select();
+                                try {
+                                    document.execCommand('copy');
+                                    alert('Message copied to clipboard!');
+                                } catch (err) {
+                                    alert('Failed to copy message. Please copy manually.');
+                                    console.error('ExecCommand copy failed:', err);
+                                }
+                                document.body.removeChild(textarea);
+                            });
+                        } catch (err) {
+                            alert('Clipboard access not available. Please copy manually.');
+                            console.error('Clipboard error:', err);
+                        }
+                    }
+                    copyText(content);
+                };
+                messageDiv.appendChild(copyBtn);
+            }
+
+            chatBody.appendChild(messageDiv);
+            chatBody.scrollTop = chatBody.scrollHeight;
+            return messageDiv;
+        }
+
+        // Remove typing message
+        function removeTypingMessage(typingDiv) {
+            if (typingDiv) {
+                typingDiv.remove();
+            }
+        }
+
+        // Check if the message is about who created the bot
+        function isCreatorQuestion(message) {
+            const patterns = [
+                /who (made|created|built|developed) (you|this bot|the bot)/i,
+                /tumhe kisne (banaya|bnaya|banai|bnai)/i,
+                /kon banaya tumhe/i,
+                /creator of (you|this bot)/i,
+                /kiski banayi hui hai/i
+            ];
+            return patterns.some(pattern => pattern.test(message));
+        }
+
+        // Fetch response from Gemini API
+        async function getGeminiResponse(message) {
+            // Check if the question is about the creator
+            if (isCreatorQuestion(message)) {
+                return 'I was created by Shivam Soni.';
+            }
+
+            try {
+                const response = await fetch(`${API_URL}?key=${API_KEY}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: message }]
+                        }]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('API request failed');
+                }
+
+                const data = await response.json();
+                return data.candidates[0].content.parts[0].text;
+            } catch (error) {
+                console.error('Error:', error);
+                return 'Sorry, something went wrong. Please try again.';
+            }
+        }
+
+        // Handle send button click
+        sendBtn.addEventListener('click', async () => {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, true);
+            userInput.value = '';
+
+            // Add typing indicator
+            const typingDiv = addMessage('Typing...', false, true);
+
+            const response = await getGeminiResponse(message);
+            removeTypingMessage(typingDiv);
+            addMessage(response, false);
+        });
+
+        // Handle clear chat button click
+        clearBtn.addEventListener('click', () => {
+            console.log('Clear Chat button clicked');
+            if (window.confirm('Are you sure you want to clear the chat history?')) {
+                console.log('Clearing chat history');
+                while (chatBody.firstChild) {
+                    chatBody.removeChild(chatBody.firstChild);
+                }
+            }
+        });
+
+        // Handle Enter key press
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendBtn.click();
+            }
+        });
+    </script>
+</body>
+</html>
